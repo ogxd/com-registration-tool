@@ -782,6 +782,24 @@ namespace SharpShell.ServerRegistration
             return value.ToString();
         }
 
+        private const string _APPROVED_SHELLEXT_REGPATH = @"Software\Microsoft\Windows\CurrentVersion\Shell Extensions\Approved";
+
+        private static RegistryKey GetApprovedShellExtKey(RegistrationType registrationType) {
+            var approvedKey = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine,
+                registrationType == RegistrationType.OS64Bit ? RegistryView.Registry64 : RegistryView.Registry32)
+                .OpenSubKey(_APPROVED_SHELLEXT_REGPATH, RegistryKeyPermissionCheck.ReadWriteSubTree);
+
+            if (approvedKey == null) {
+                approvedKey = Registry.LocalMachine.CreateSubKey(_APPROVED_SHELLEXT_REGPATH);
+            }
+
+            if (approvedKey == null) {
+                throw new InvalidOperationException("Failed to open the Approved Extensions key.");
+            }
+
+            return approvedKey;
+        }
+
         /// <summary>
         /// Approves an extension.
         /// </summary>
@@ -791,14 +809,7 @@ namespace SharpShell.ServerRegistration
         private static void ApproveExtension(ISharpShellServer server, RegistrationType registrationType)
         {
             //  Open the approved extensions key.
-            using(var approvedKey = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, 
-                registrationType == RegistrationType.OS64Bit ? RegistryView.Registry64 : RegistryView.Registry32)
-                .OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Shell Extensions\Approved", RegistryKeyPermissionCheck.ReadWriteSubTree))
-            {
-                //  If we can't open the key, we're going to have problems.
-                if(approvedKey == null)
-                    throw new InvalidOperationException("Failed to open the Approved Extensions key.");
-
+            using (var approvedKey = GetApprovedShellExtKey(registrationType)) {
                 //  Create an entry for the server.
                 approvedKey.SetValue(server.ServerClsid.ToRegistryString(), server.DisplayName);
             }
@@ -816,14 +827,7 @@ namespace SharpShell.ServerRegistration
         private static bool IsExtensionApproved(Guid serverClsid, RegistrationType registrationType)
         {
             //  Open the approved extensions key.
-            using (var approvedKey = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine,
-                registrationType == RegistrationType.OS64Bit ? RegistryView.Registry64 : RegistryView.Registry32)
-                .OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Shell Extensions\Approved", RegistryKeyPermissionCheck.ReadSubTree))
-            {
-                //  If we can't open the key, we're going to have problems.
-                if (approvedKey == null)
-                    throw new InvalidOperationException("Failed to open the Approved Extensions key.");
-
+            using (var approvedKey = GetApprovedShellExtKey(registrationType)) {
                 return approvedKey.GetValueNames().Any(vn => vn.Equals(serverClsid.ToRegistryString(), StringComparison.OrdinalIgnoreCase));
             }
         }
@@ -837,14 +841,7 @@ namespace SharpShell.ServerRegistration
         private static void UnapproveExtension(ISharpShellServer server, RegistrationType registrationType)
         {
             //  Open the approved extensions key.
-            using (var approvedKey = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine,
-                registrationType == RegistrationType.OS64Bit ? RegistryView.Registry64 : RegistryView.Registry32)
-                .OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Shell Extensions\Approved", RegistryKeyPermissionCheck.ReadWriteSubTree))
-            {
-                //  If we can't open the key, we're going to have problems.
-                if (approvedKey == null)
-                    throw new InvalidOperationException("Failed to open the Approved Extensions key.");
-
+            using (var approvedKey = GetApprovedShellExtKey(registrationType)) {
                 //  Delete the value if it's there.
                 approvedKey.DeleteValue(server.ServerClsid.ToRegistryString(), false);
             }
